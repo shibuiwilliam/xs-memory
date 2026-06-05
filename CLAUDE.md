@@ -4,13 +4,13 @@ This file is the operating guide that Claude Code reads at the start of every se
 Detailed conventions and design live in the two files below; this file covers only day-to-day operations and the most critical guardrails.
 
 @PROJECT.md
-@docs/small-memory-design.md
+@docs/xs-memory-design.md
 
 ---
 
 ## What This Repository Is
 
-`small-memory`: An embedded memory engine for local AI agents ("SQLite for agents").
+`xs-memory`: An embedded memory engine for local AI agents ("SQLite for agents").
 Pure Go, single binary. Full-text / vector / hybrid search + small-scale knowledge graph. Provides CLI and MCP.
 
 Only **MVP (v0.1)** may be implemented right now (PROJECT.md §7). Anything beyond that should remain a proposal.
@@ -41,7 +41,7 @@ The full list is PROJECT.md §3 (N1–N9). These five have top priority:
 2. **Explicit memory budget control.** Block cache LRU guarantees the upper bound. Never implement "load everything into RAM."
 3. **No LLM on the critical path.** Organization is async and optional. Search must work even when unconfigured.
 4. **Deletion defaults to soft** (tombstone). Physical deletion only with an explicit flag.
-5. **The public API is `smem` only.** UIs never touch `internal/` directly.
+5. **The public API is `xsmem` only.** UIs never touch `internal/` directly.
 
 When in doubt, read the relevant design doc section before writing code. Do not introduce major decisions not in the design doc — present them as proposed additions to the Decision Log.
 

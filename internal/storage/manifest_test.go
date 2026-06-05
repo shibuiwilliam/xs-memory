@@ -8,7 +8,7 @@ import (
 
 func TestManifestReadWriteRoundtrip(t *testing.T) {
 	dir := t.TempDir()
-	storePath := filepath.Join(dir, "test.smem")
+	storePath := filepath.Join(dir, "test.xsmem")
 	os.MkdirAll(storePath, 0o755)
 
 	// Reading non-existent manifest should return empty default.

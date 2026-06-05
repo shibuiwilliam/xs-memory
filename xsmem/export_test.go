@@ -11,7 +11,7 @@ import (
 
 func TestExportImportRoundtrip(t *testing.T) {
 	dir := t.TempDir()
-	origPath := filepath.Join(dir, "original.smem")
+	origPath := filepath.Join(dir, "original.xsmem")
 
 	s, err := xsmem.Open(origPath)
 	if err != nil {
@@ -30,7 +30,7 @@ func TestExportImportRoundtrip(t *testing.T) {
 	s.Close()
 
 	// Import to new location.
-	importPath := filepath.Join(dir, "imported.smem")
+	importPath := filepath.Join(dir, "imported.xsmem")
 	if err := xsmem.Import(importPath, &buf); err != nil {
 		t.Fatalf("Import: %v", err)
 	}

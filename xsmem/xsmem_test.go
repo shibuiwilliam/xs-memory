@@ -13,7 +13,7 @@ import (
 func openTestStore(t *testing.T, opts ...xsmem.Option) *xsmem.Store {
 	t.Helper()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "test.smem")
+	path := filepath.Join(dir, "test.xsmem")
 
 	s, err := xsmem.Open(path, opts...)
 	if err != nil {
@@ -25,7 +25,7 @@ func openTestStore(t *testing.T, opts ...xsmem.Option) *xsmem.Store {
 
 func TestOpenClose(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "test.smem")
+	path := filepath.Join(dir, "test.xsmem")
 
 	s, err := xsmem.Open(path)
 	if err != nil {

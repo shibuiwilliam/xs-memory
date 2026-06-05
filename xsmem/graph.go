@@ -22,7 +22,7 @@ func (s *Store) Link(ctx context.Context, t Triple) error {
 	defer s.mu.Unlock()
 
 	if s.graph == nil {
-		return fmt.Errorf("smem: graph not initialized")
+		return fmt.Errorf("xsmem: graph not initialized")
 	}
 
 	return s.graph.AddTriple(graph.Triple{
@@ -40,7 +40,7 @@ func (s *Store) Unlink(ctx context.Context, subject, predicate, object string) e
 	defer s.mu.Unlock()
 
 	if s.graph == nil {
-		return fmt.Errorf("smem: graph not initialized")
+		return fmt.Errorf("xsmem: graph not initialized")
 	}
 
 	return s.graph.RemoveTriple(subject, predicate, object)
@@ -57,7 +57,7 @@ func (s *Store) GraphExpand(ctx context.Context, entity string, hops int) ([]Tri
 
 	triples, err := s.graph.Expand(entity, hops)
 	if err != nil {
-		return nil, fmt.Errorf("smem: graph expand: %w", err)
+		return nil, fmt.Errorf("xsmem: graph expand: %w", err)
 	}
 
 	result := make([]Triple, len(triples))

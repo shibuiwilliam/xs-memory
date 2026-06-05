@@ -1,4 +1,4 @@
-// Package smem is the public API for small-memory, an embedded memory engine
+// Package xsmem is the public API for xs-memory, an embedded memory engine
 // for local AI agents. All UI layers (CLI, MCP, Web) use this package exclusively.
 // See design §2 (principle 2) and PROJECT.md N3/N9.
 package xsmem
@@ -71,7 +71,7 @@ type Result struct {
 	ChunkText string  `json:"chunk_text,omitempty"`
 }
 
-// Store is the main handle to a small-memory store directory.
+// Store is the main handle to an xs-memory store directory.
 // See design §2 principle 1: SQLite mental model.
 type Store struct {
 	path     string
@@ -112,7 +112,7 @@ type Store struct {
 	tuningStore *tuning.Store
 }
 
-// Open opens or creates a small-memory store at the given path.
+// Open opens or creates an xs-memory store at the given path.
 // See design §6.1 for file layout.
 func Open(path string, opts ...Option) (*Store, error) {
 	cfg := defaultConfig()
@@ -124,34 +124,34 @@ func Open(path string, opts ...Option) (*Store, error) {
 
 	// Ensure the store directory exists.
 	if err := os.MkdirAll(path, 0o755); err != nil {
-		return nil, fmt.Errorf("smem: create store directory: %w", err)
+		return nil, fmt.Errorf("xsmem: create store directory: %w", err)
 	}
 
 	// Create subdirectories per design §6.1.
 	for _, sub := range []string{"wal", "segments", "blobs"} {
 		if err := os.MkdirAll(filepath.Join(path, sub), 0o755); err != nil {
-			return nil, fmt.Errorf("smem: create %s directory: %w", sub, err)
+			return nil, fmt.Errorf("xsmem: create %s directory: %w", sub, err)
 		}
 	}
 
 	// File lock for exclusive access. See design §12.
 	lock, err := storage.LockStore(path)
 	if err != nil {
-		return nil, fmt.Errorf("smem: %w", err)
+		return nil, fmt.Errorf("xsmem: %w", err)
 	}
 
 	// Read manifest. See design §6.1.
 	manifest, err := storage.ReadManifest(path)
 	if err != nil {
 		lock.Unlock()
-		return nil, fmt.Errorf("smem: %w", err)
+		return nil, fmt.Errorf("xsmem: %w", err)
 	}
 
 	// Open bbolt meta store.
 	meta, err := storage.OpenMeta(filepath.Join(path, "meta.db"))
 	if err != nil {
 		lock.Unlock()
-		return nil, fmt.Errorf("smem: %w", err)
+		return nil, fmt.Errorf("xsmem: %w", err)
 	}
 
 	// Open WAL. See design §6.2.
@@ -159,7 +159,7 @@ func Open(path string, opts ...Option) (*Store, error) {
 	if err != nil {
 		meta.Close()
 		lock.Unlock()
-		return nil, fmt.Errorf("smem: %w", err)
+		return nil, fmt.Errorf("xsmem: %w", err)
 	}
 
 	// Block cache with memory budget. See design §6.3, N2.
@@ -227,7 +227,7 @@ func (s *Store) Close() error {
 	defer s.mu.Unlock()
 
 	if s.closed {
-		return fmt.Errorf("smem: store already closed")
+		return fmt.Errorf("xsmem: store already closed")
 	}
 	s.closed = true
 
@@ -261,7 +261,7 @@ func (s *Store) CreateCollection(name string, analyzerID string, embedderID stri
 	defer s.mu.Unlock()
 
 	if _, exists := s.manifest.Collections[name]; exists {
-		return fmt.Errorf("smem: collection %q already exists", name)
+		return fmt.Errorf("xsmem: collection %q already exists", name)
 	}
 
 	col := storage.CollectionConfig{
@@ -273,11 +273,11 @@ func (s *Store) CreateCollection(name string, analyzerID string, embedderID stri
 
 	s.manifest.Collections[name] = col
 	if err := storage.WriteManifest(s.path, s.manifest); err != nil {
-		return fmt.Errorf("smem: save manifest: %w", err)
+		return fmt.Errorf("xsmem: save manifest: %w", err)
 	}
 
 	if err := s.meta.PutCollection(col); err != nil {
-		return fmt.Errorf("smem: save collection meta: %w", err)
+		return fmt.Errorf("xsmem: save collection meta: %w", err)
 	}
 
 	return s.initCollectionIndexes(col)
@@ -289,7 +289,7 @@ func (s *Store) Remember(ctx context.Context, opts RememberOpts) (string, error)
 	defer s.mu.Unlock()
 
 	if s.closed {
-		return "", fmt.Errorf("smem: store closed")
+		return "", fmt.Errorf("xsmem: store closed")
 	}
 
 	// Verify collection exists; auto-create "default" if needed.
@@ -316,13 +316,13 @@ func (s *Store) Remember(ctx context.Context, opts RememberOpts) (string, error)
 			s.meta.PutCollection(col)
 			s.initCollectionIndexes(col)
 		} else {
-			return "", fmt.Errorf("smem: collection %q not found", opts.Collection)
+			return "", fmt.Errorf("xsmem: collection %q not found", opts.Collection)
 		}
 	}
 
 	id, err := ulid.New(ulid.Now(), rand.Reader)
 	if err != nil {
-		return "", fmt.Errorf("smem: generate id: %w", err)
+		return "", fmt.Errorf("xsmem: generate id: %w", err)
 	}
 
 	// Run ingestion pipeline.
@@ -337,23 +337,23 @@ func (s *Store) Remember(ctx context.Context, opts RememberOpts) (string, error)
 		Importance:  opts.Importance,
 	})
 	if err != nil {
-		return "", fmt.Errorf("smem: ingest: %w", err)
+		return "", fmt.Errorf("xsmem: ingest: %w", err)
 	}
 
 	// Write to WAL. See design §6.2.
 	memJSON, err := json.Marshal(result.Memory)
 	if err != nil {
-		return "", fmt.Errorf("smem: marshal memory: %w", err)
+		return "", fmt.Errorf("xsmem: marshal memory: %w", err)
 	}
 	if err := s.wal.Append(storage.WALRecord{
 		Op: storage.WALOpPut, MemoryID: id, Data: memJSON,
 	}); err != nil {
-		return "", fmt.Errorf("smem: wal append: %w", err)
+		return "", fmt.Errorf("xsmem: wal append: %w", err)
 	}
 
 	// Store in meta.
 	if err := s.meta.PutMemory(result.Memory); err != nil {
-		return "", fmt.Errorf("smem: store meta: %w", err)
+		return "", fmt.Errorf("xsmem: store meta: %w", err)
 	}
 
 	// Index chunks.
@@ -385,7 +385,7 @@ func (s *Store) Search(ctx context.Context, opts SearchOpts) ([]Result, error) {
 	defer s.mu.RUnlock()
 
 	if s.closed {
-		return nil, fmt.Errorf("smem: store closed")
+		return nil, fmt.Errorf("xsmem: store closed")
 	}
 
 	col := opts.Collection
@@ -407,7 +407,7 @@ func (s *Store) Search(ctx context.Context, opts SearchOpts) ([]Result, error) {
 		RRFk:       60,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("smem: search: %w", err)
+		return nil, fmt.Errorf("xsmem: search: %w", err)
 	}
 
 	// Convert to public results, resolving memory metadata.
@@ -460,15 +460,15 @@ func (s *Store) Get(ctx context.Context, id string) (*Memory, error) {
 
 	uid, err := ulid.Parse(id)
 	if err != nil {
-		return nil, fmt.Errorf("smem: invalid id: %w", err)
+		return nil, fmt.Errorf("xsmem: invalid id: %w", err)
 	}
 
 	mem, err := s.meta.GetMemory(uid)
 	if err != nil {
-		return nil, fmt.Errorf("smem: %w", err)
+		return nil, fmt.Errorf("xsmem: %w", err)
 	}
 	if mem.Deleted {
-		return nil, fmt.Errorf("smem: memory %s is deleted", id)
+		return nil, fmt.Errorf("xsmem: memory %s is deleted", id)
 	}
 
 	// Update access stats.
@@ -487,15 +487,15 @@ func (s *Store) Update(ctx context.Context, id string, patch UpdateOpts) error {
 
 	uid, err := ulid.Parse(id)
 	if err != nil {
-		return fmt.Errorf("smem: invalid id: %w", err)
+		return fmt.Errorf("xsmem: invalid id: %w", err)
 	}
 
 	mem, err := s.meta.GetMemory(uid)
 	if err != nil {
-		return fmt.Errorf("smem: %w", err)
+		return fmt.Errorf("xsmem: %w", err)
 	}
 	if mem.Deleted {
-		return fmt.Errorf("smem: memory %s is deleted", id)
+		return fmt.Errorf("xsmem: memory %s is deleted", id)
 	}
 
 	if patch.Content != nil {
@@ -546,14 +546,14 @@ func (s *Store) Forget(ctx context.Context, id string, hard bool) error {
 
 	uid, err := ulid.Parse(id)
 	if err != nil {
-		return fmt.Errorf("smem: invalid id: %w", err)
+		return fmt.Errorf("xsmem: invalid id: %w", err)
 	}
 
 	// Write to WAL.
 	if err := s.wal.Append(storage.WALRecord{
 		Op: storage.WALOpDelete, MemoryID: uid,
 	}); err != nil {
-		return fmt.Errorf("smem: wal append: %w", err)
+		return fmt.Errorf("xsmem: wal append: %w", err)
 	}
 
 	// Get memory to know its collection (for index removal).
@@ -580,7 +580,7 @@ func (s *Store) List(ctx context.Context, collection string) ([]Memory, error) {
 
 	mems, err := s.meta.ListMemories(collection)
 	if err != nil {
-		return nil, fmt.Errorf("smem: %w", err)
+		return nil, fmt.Errorf("xsmem: %w", err)
 	}
 
 	result := make([]Memory, len(mems))

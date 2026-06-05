@@ -1,6 +1,6 @@
-# small-memory — Design Addendum 2: Adaptive Index Tuning, In-Memory Cache & Optional Grep
+# xs-memory — Design Addendum 2: Adaptive Index Tuning, In-Memory Cache & Optional Grep
 
-> Addendum to `docs/small-memory-design.md` (base) and the host-LLM/skill addendum.
+> Addendum to `docs/xs-memory-design.md` (base) and the host-LLM/skill addendum.
 > Covers three features:
 > 1. **Usage-driven adaptive ranking & index tuning** — learn from how memories are searched and used, and adjust the index/ranking accordingly.
 > 2. **In-memory cache** — cache the top ~100 hot entries; evict by LRU or invalidate when the source data changes.
@@ -63,7 +63,7 @@ Three signal sources, cheapest first:
 memory_record_usage(query_id, memory_ids[], outcome=used|cited|ignored)
 ```
 
-The `/small-memory` skill instructs the host model, after a recall, to report which memory IDs it actually grounded its answer on. This is the cleanest signal and uses the host's own judgment (Addendum 1, §2). Fallbacks when the agent doesn't report:
+The `/xs-memory` skill instructs the host model, after a recall, to report which memory IDs it actually grounded its answer on. This is the cleanest signal and uses the host's own judgment (Addendum 1, §2). Fallbacks when the agent doesn't report:
 - **Implicit click**: a `memory_get`/`memory_recall` for a specific ID shortly after a search in the same session is attributed to that search's `query_id`.
 - **No signal**: impression-only; the item still accrues exposure but no usage credit.
 
@@ -116,7 +116,7 @@ Beyond runtime re-ranking, the learned model feeds three concrete index/storage 
 - **Storage.** A separate `tuning` namespace (its own bbolt tables / small DB), independent of immutable segments so it never violates LSM immutability. Exported/imported with the store (design §6.1).
 - **Decay schedule.** A background job applies time-decay and prunes the bounded tables (top-N/top-M) on a cadence.
 - **Invalidation.** On `memory_forget`/`memory_merge`, drop the affected items' priors and affinity entries (provenance link).
-- **Reset.** `smem tuning reset [--collection c]` clears all learned signals → instant return to base behavior. `smem tuning export/import` for portability and inspection.
+- **Reset.** `xsmem tuning reset [--collection c]` clears all learned signals → instant return to base behavior. `xsmem tuning export/import` for portability and inspection.
 
 ### 1.6 Explainability & feedback-loop safety
 
@@ -179,7 +179,7 @@ LRU handles capacity; the generation counter handles freshness. Together they sa
 
 - Hard entry caps (default 100 each) **and** a byte budget; whichever binds first triggers LRU eviction. Counts against the global memory budget (design N2).
 - Read-heavy: a sharded/striped LRU (lock per shard) to avoid contention; lock-free fast path on hit where feasible.
-- Metrics: hit rate, evictions, invalidations surfaced in `smem stats` (design §8.4 / observability).
+- Metrics: hit rate, evictions, invalidations surfaced in `xsmem stats` (design §8.4 / observability).
 
 ### 2.5 Interaction with Feature 1 and the block cache
 
@@ -279,12 +279,12 @@ use_ripgrep = false            # optional external accel (build tag)
 - `memory_feedback(query_id, memory_id, useful)` — explicit feedback.
 - `memory_recall`/`memory_search` gain optional `grep`, `regex`, and return a `query_id` (so usage can be attributed) plus `grep_truncated` and highlight spans.
 
-**Skill (`/small-memory`).** After a recall, the skill instructs the host model to call `memory_record_usage` with the IDs it actually used. `/small-memory recall --grep <pattern>` exposes the grep lane.
+**Skill (`/xs-memory`).** After a recall, the skill instructs the host model to call `memory_record_usage` with the IDs it actually used. `/xs-memory recall --grep <pattern>` exposes the grep lane.
 
 **CLI.**
-- `smem search … [--grep] [--regex] [--case-sensitive] [--explain]` (explain now shows adaptive boosts).
-- `smem tuning {stats|reset|export|import} [--collection c]`.
-- `smem stats` reports cache hit/miss/eviction/invalidation and tuning model size.
+- `xsmem search … [--grep] [--regex] [--case-sensitive] [--explain]` (explain now shows adaptive boosts).
+- `xsmem tuning {stats|reset|export|import} [--collection c]`.
+- `xsmem stats` reports cache hit/miss/eviction/invalidation and tuning model size.
 
 ---
 

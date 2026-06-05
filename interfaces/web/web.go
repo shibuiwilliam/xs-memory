@@ -1,4 +1,4 @@
-// Package web provides a Web UI plugin for small-memory.
+// Package web provides a Web UI plugin for xs-memory.
 // Built only when the "webui" build tag is used. See design §13.3.
 //
 //go:build webui

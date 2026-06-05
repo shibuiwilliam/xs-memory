@@ -34,11 +34,9 @@ go.work.sum
 bin/
 
 # Local memory stores
-.smem/
 .xsmem/
-default.smem/
 default.xsmem/
-*.smem/
+default.smem/
 *.xsmem/
 
 # Claude Code local config

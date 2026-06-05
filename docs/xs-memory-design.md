@@ -1,4 +1,4 @@
-# small-memory Design Document
+# xs-memory Design Document
 
 > A document/file indexing and search engine for AI agents running in local environments.
 > A lightweight, multi-platform, embeddable memory engine aiming to be "SQLite for AI Agents."
@@ -44,12 +44,12 @@ An embedded memory engine that enables local AI agents to "remember, organize, r
 ## 2. Design Principles
 
 1. **SQLite mental model**: `Open(path) → handle → operations → Close`. The store is a set of files (or a directory). Portable by copying.
-2. **Core is a library**: CLI / MCP / Web UI are thin adapters. They all call the same Go package `smem`.
+2. **Core is a library**: CLI / MCP / Web UI are thin adapters. They all call the same Go package `xsmem`.
 3. **Progressive complexity**: Start with something simple and correct (flat vector, brute force) → add HNSW etc. only after measuring.
 4. **Explicit memory budget control**: Don't rely on OS page cache. Maintain a self-managed block cache with guaranteed upper bounds (cross-platform reproducibility).
 5. **LLM is async, optional, and swappable**: Never place LLM on the critical path.
 6. **Don't break**: WAL + immutable segments + checksums. Recovery via replay after a crash.
-7. **Observability**: Structured logging, metrics, `smem stats`, and EXPLAIN-equivalent query plan output.
+7. **Observability**: Structured logging, metrics, `xsmem stats`, and EXPLAIN-equivalent query plan output.
 
 ---
 
@@ -64,7 +64,7 @@ An embedded memory engine that enables local AI agents to "remember, organize, r
 | D5 | Hybrid fusion | **RRF (Reciprocal Rank Fusion) as default** | No score normalization needed; robust. Weighted linear combination is an option. |
 | D6 | Tokenizer | **Kagome (Japanese morphological analysis) + pluggable language-specific analyzers** | Don't retrofit CJK later. English uses a standard analyzer; fallback is bigram. |
 | D7 | LLM integration | **Async jobs + provider interface** | Removed from the ingestion critical path. Can run entirely locally with Ollama. |
-| D8 | Store format | **Directory (`*.smem/`) + archive transport** | Segment design pairs well with directories. Single-file transport is provided via export/import (tar). |
+| D8 | Store format | **Directory (`*.xsmem/`) + archive transport** | Segment design pairs well with directories. Single-file transport is provided via export/import (tar). |
 | D9 | Schema | **Collections (namespaces) + loose metadata (JSON)** | Per-agent/project isolation = equivalent to SQLite's "tables." |
 
 ---
@@ -79,7 +79,7 @@ flowchart TB
     WEB["Web UI plugin (go:embed, build tag)"]
   end
 
-  subgraph CORE["Core API Library (package smem)"]
+  subgraph CORE["Core API Library (package xsmem)"]
     API["Store handle / Memory API\nStore Search Update Delete Link Organize"]
   end
 
@@ -122,7 +122,7 @@ flowchart TB
   ING --> BLOB
 ```
 
-Layers depend only downward. The interface layer knows only `smem` and never touches the engine layer directly.
+Layers depend only downward. The interface layer knows only `xsmem` and never touches the engine layer directly.
 
 ---
 
@@ -184,7 +184,7 @@ type Triple struct {
 
 ### 6.1 File Layout
 ```
-mystore.smem/
+mystore.xsmem/
 ├── manifest.json        # schema version, collection definitions, embedding model/dimensions
 ├── meta.db              # bbolt: Memory metadata, Collection, Triple indexes (SPO/POS/OSP), tombstones
 ├── wal/                 # write-ahead log (for recovery)
@@ -195,7 +195,7 @@ mystore.smem/
 ├── vectors/             # (optional) separated quantized vector data
 └── blobs/               # large content bodies (SHA-256 content-addressed)
 ```
-Transport via `smem export store.tar` to bundle into a single file (preserving the SQLite single-`.db` experience).
+Transport via `xsmem export store.tar` to bundle into a single file (preserving the SQLite single-`.db` experience).
 
 ### 6.2 Write Path (LSM-style)
 1. Writes are **appended to the WAL** → following the fsync policy (configurable as `synchronous=normal/full` equivalent).
@@ -295,7 +295,7 @@ final = w_rel·relevance
 - This naturally sinks "relevant but old and unimportant memories."
 
 ### 8.4 Query Plan Output (EXPLAIN)
-`smem search --explain` outputs "which segments were touched, cache hit rate, per-stage latency, pre- and post-fusion scores." Essential for tuning and reliability.
+`xsmem search --explain` outputs "which segments were touched, cache hit rate, per-stage latency, pre- and post-fusion scores." Essential for tuning and reliability.
 
 ---
 
@@ -361,7 +361,7 @@ Implementations: `openai`, `anthropic`, `gemini`, `ollama` (local), `mock` (for 
 ## 12. Process Model and Concurrency
 
 - **Embedded mode (default)**: In-process as a library. Single process, single writer (RWMutex). Multiple readers allowed.
-- **Daemon mode**: `smem serve` — one process owns the store and listens on a Unix domain socket (named pipe on Windows).
+- **Daemon mode**: `xsmem serve` — one process owns the store and listens on a Unix domain socket (named pipe on Windows).
   - MCP server, Web UI, and multiple agents connect here → physically eliminates multi-writer problems (D2).
 - File lock: An exclusive lock file is placed in the store directory to detect double-opens.
 - Writes are serialized through the WAL. Reads are nearly lock-free due to segment immutability.
@@ -372,20 +372,20 @@ Implementations: `openai`, `anthropic`, `gemini`, `ollama` (local), `mock` (for 
 
 ### 13.1 CLI (cobra)
 ```
-smem init <store> [--collection default --embedder ollama:nomic-embed-text]
-smem add  <store> --collection c [file... | -]   # stdin supported
-smem search <store> "query" [--mode hybrid --topk 10 --explain --filter tag=foo]
-smem get  <store> <id>
-smem update <store> <id> ...
-smem rm   <store> <id>
-smem link <store> <s> <predicate> <o>            # manual graph edge
-smem ls   <store> [--collection c]
-smem organize <store> [--jobs dedup,extract]     # manual organizer invocation
-smem serve <store> [--socket ...]                 # daemon
-smem mcp   <store>                                # MCP (stdio) server
-smem import/export <store> <archive.tar>
-smem stats <store>                                # counts, segments, cache hit rate
-smem compact <store>
+xsmem init <store> [--collection default --embedder ollama:nomic-embed-text]
+xsmem add  <store> --collection c [file... | -]   # stdin supported
+xsmem search <store> "query" [--mode hybrid --topk 10 --explain --filter tag=foo]
+xsmem get  <store> <id>
+xsmem update <store> <id> ...
+xsmem rm   <store> <id>
+xsmem link <store> <s> <predicate> <o>            # manual graph edge
+xsmem ls   <store> [--collection c]
+xsmem organize <store> [--jobs dedup,extract]     # manual organizer invocation
+xsmem serve <store> [--socket ...]                 # daemon
+xsmem mcp   <store>                                # MCP (stdio) server
+xsmem import/export <store> <archive.tar>
+xsmem stats <store>                                # counts, segments, cache hit rate
+xsmem compact <store>
 ```
 
 ### 13.2 MCP Server
@@ -419,7 +419,7 @@ Resources: Each collection is exposed as an MCP resource, allowing agents to lis
 Priority: Flags > Environment variables > Config file (TOML) > Defaults.
 ```toml
 [store]
-path = "~/.smem/default.smem"
+path = "~/.xsmem/default.xsmem"
 
 [memory]
 block_cache_mb = 256
@@ -473,9 +473,9 @@ analyzer = "ja"          # ja | en | bigram
 ## 16. Package Layout (Go)
 
 ```
-small-memory/
-├── cmd/smem/                 # CLI entry point
-├── smem/                     # Public Core API (Open, Store, Search ...)
+xs-memory/
+├── cmd/xsmem/                 # CLI entry point
+├── xsmem/                     # Public Core API (Open, Store, Search ...)
 ├── internal/
 │   ├── storage/              # WAL, segment, blockcache (LRU), bbolt wrapper
 │   ├── index/
@@ -492,7 +492,7 @@ small-memory/
 │   └── web/                  # Web UI (build tag webui)
 └── docs/
 ```
-- Everything except `smem` is hidden under `internal/`. Protects the stable API.
+- Everything except `xsmem` is hidden under `internal/`. Protects the stable API.
 - `storage.Engine`, `provider.Embedder/LLM`, `analyzer.Analyzer` are interface-abstracted (swappable/testable).
 
 ---
@@ -533,7 +533,7 @@ small-memory/
 ## 18. Risks and Open Questions
 
 1. **CGO boundary**: Kagome (pure Go, OK) is not an issue, but tree-sitter requires CGO. To maintain the pure Go single binary flag, code splitting defaults to a simple version. → Separated by build tag (decided).
-2. **Vector memory budget**: 1M × 768 in int8 is ~768MB. With the default 256MB budget, block eviction will be frequent, increasing latency. → Document guidelines for PQ compression or collection splitting. Have `stats` emit a warning suggesting "migration to HNSW/PQ" at threshold.
+2. **Vector memory budget**: 1M × 768 in int8 is ~768MB. With the default 256MB budget, block eviction will be frequent, increasing latency. → Document guidelines for PQ compression or collection splitting. Have `xsmem stats` emit a warning suggesting "migration to HNSW/PQ" at threshold.
 3. **Multi-process**: Accidental double-opening of a store in embedded mode. → Exclusive lock + clear error message. Document daemon recommendation.
 4. **Embedding model inconsistency**: Changing the model later alters dimensions/distribution. → Stamp onto collection and prohibit changes; provide a rebuild command.
 5. **LLM organization non-determinism/cost**: Concern that auto-consolidation and auto-deletion could corrupt data. → Default soft deletion + provenance retention + dry run (`--dry-run`).
@@ -544,7 +544,7 @@ small-memory/
 ## Appendix A: Public API Sketch
 
 ```go
-package smem
+package xsmem
 
 type Store struct{ /* ... */ }
 

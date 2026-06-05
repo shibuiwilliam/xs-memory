@@ -14,7 +14,7 @@ func (s *Store) Organize(ctx context.Context, collection string, jobs ...string)
 	defer s.mu.Unlock()
 
 	if s.organizer == nil {
-		return fmt.Errorf("smem: no LLM configured for organize")
+		return fmt.Errorf("xsmem: no LLM configured for organize")
 	}
 
 	if collection == "" {
@@ -23,7 +23,7 @@ func (s *Store) Organize(ctx context.Context, collection string, jobs ...string)
 
 	mems, err := s.meta.ListMemories(collection)
 	if err != nil {
-		return fmt.Errorf("smem: list for organize: %w", err)
+		return fmt.Errorf("xsmem: list for organize: %w", err)
 	}
 
 	jobSet := make(map[string]bool)

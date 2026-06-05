@@ -48,7 +48,7 @@ func (s *Store) findDuplicateCandidatesLocked(collection string, threshold float
 
 	mems, err := s.meta.ListMemories(collection)
 	if err != nil {
-		return nil, fmt.Errorf("smem: list for dup detection: %w", err)
+		return nil, fmt.Errorf("xsmem: list for dup detection: %w", err)
 	}
 	if len(mems) < 2 {
 		return nil, nil
@@ -59,7 +59,7 @@ func (s *Store) findDuplicateCandidatesLocked(collection string, threshold float
 		return nil, nil // no vector index → can't detect duplicates
 	}
 
-	// O(n^2) pairwise comparison — sufficient for small-memory scale.
+	// O(n^2) pairwise comparison — sufficient for xs-memory scale.
 	type memPair struct{ a, b int }
 	var pairs []memPair
 
@@ -149,7 +149,7 @@ func (s *Store) SuggestOrganization(ctx context.Context, collection string) (*Wo
 
 	mems, err := s.meta.ListMemories(collection)
 	if err != nil {
-		return nil, fmt.Errorf("smem: list for organization: %w", err)
+		return nil, fmt.Errorf("xsmem: list for organization: %w", err)
 	}
 
 	wp := &WorkPacket{}
@@ -192,13 +192,13 @@ func appendToEpisodicPool(clusters []EpisodicCluster, mem Memory) []EpisodicClus
 // See addendum §4.2.
 func (s *Store) Merge(ctx context.Context, opts MergeOpts) (string, error) {
 	if !opts.Confirmed {
-		return "", fmt.Errorf("smem: merge requires confirmed=true (addendum H5)")
+		return "", fmt.Errorf("xsmem: merge requires confirmed=true (addendum H5)")
 	}
 	if len(opts.IDs) < 2 {
-		return "", fmt.Errorf("smem: merge requires at least 2 memory IDs")
+		return "", fmt.Errorf("xsmem: merge requires at least 2 memory IDs")
 	}
 	if opts.Summary == "" {
-		return "", fmt.Errorf("smem: merge requires a summary")
+		return "", fmt.Errorf("xsmem: merge requires a summary")
 	}
 
 	// Store the merged summary as a new memory.
@@ -215,7 +215,7 @@ func (s *Store) Merge(ctx context.Context, opts MergeOpts) (string, error) {
 		Importance: opts.Importance,
 	})
 	if err != nil {
-		return "", fmt.Errorf("smem: store merged summary: %w", err)
+		return "", fmt.Errorf("xsmem: store merged summary: %w", err)
 	}
 
 	// Tombstone originals (soft delete per N7).

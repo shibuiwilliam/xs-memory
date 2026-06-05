@@ -35,13 +35,13 @@ All v0.1–v1.0 phases and Addendum 1 (host-delegated LLM, Agent Skill) complete
 - [x] ComputeBoost: additive, capped at boost_cap * base_score
 - [x] Cold start = 0 boost = base behavior (A2)
 - [x] Boost cap enforced (A2): near-zero-base + high-affinity cannot exceed cap
-- [x] Wired into smem.Store: resultCache, grepEngine, tuningStore initialized in Open
+- [x] Wired into xsmem.Store: resultCache, grepEngine, tuningStore initialized in Open
 - [x] Cache invalidation on all write paths (Remember, Update, Forget)
 - [x] Tuning signal purge on Forget
 
 ### Phase E — Lifecycle, Surfaces & Integration (addendum2 §5) [DONE]
-- [x] `smem.RecordUsage()`, `smem.TuningReset()`, `smem.TuningEpoch()` public API
-- [x] `smem stats` reports block cache + result cache + tuning stats
+- [x] `xsmem.RecordUsage()`, `xsmem.TuningReset()`, `xsmem.TuningEpoch()` public API
+- [x] `xsmem stats` reports block cache + result cache + tuning stats
 - [x] MCP tools: memory_record_usage, memory_feedback wired
 - [x] SearchOpts extended with GrepEnabled/GrepPattern/GrepRegex/GrepCaseSens
 - [x] All smoke tests pass

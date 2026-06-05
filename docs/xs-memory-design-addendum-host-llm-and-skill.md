@@ -1,8 +1,8 @@
-# small-memory — Design Addendum: Host-Delegated LLM & the `/small-memory` Agent Skill
+# xs-memory — Design Addendum: Host-Delegated LLM & the `/xs-memory` Agent Skill
 
-> Addendum to `docs/small-memory-design.md`. Covers two features:
-> 1. Using small-memory from coding agents (Claude Code, Codex) over **MCP**, reusing the **host agent's LLM** wherever possible instead of small-memory's own provider.
-> 2. Shipping a **`/small-memory` Agent Skill** that orchestrates this from inside the host agent.
+> Addendum to `docs/xs-memory-design.md`. Covers two features:
+> 1. Using xs-memory from coding agents (Claude Code, Codex) over **MCP**, reusing the **host agent's LLM** wherever possible instead of xs-memory's own provider.
+> 2. Shipping a **`/xs-memory` Agent Skill** that orchestrates this from inside the host agent.
 >
 > - Status: Draft (v0.1)
 > - Depends on: design §10 (LLM Organizer), §11 (Provider abstraction), §13.2 (MCP interface)
@@ -11,7 +11,7 @@
 
 ## 1. Motivation
 
-When small-memory runs as an MCP server inside a coding agent, that agent already has a capable, authenticated LLM (Claude Code → Claude; Codex → GPT). Spinning up a *second* LLM inside small-memory for organization work would mean: duplicate credentials, duplicate cost, a second model that may be weaker than the host's, and data leaving the host's trust boundary. We want the opposite: **let the host's model do the thinking; let small-memory do the storage and the deterministic retrieval.**
+When xs-memory runs as an MCP server inside a coding agent, that agent already has a capable, authenticated LLM (Claude Code → Claude; Codex → GPT). Spinning up a *second* LLM inside xs-memory for organization work would mean: duplicate credentials, duplicate cost, a second model that may be weaker than the host's, and data leaving the host's trust boundary. We want the opposite: **let the host's model do the thinking; let xs-memory do the storage and the deterministic retrieval.**
 
 This addendum defines a **tiered LLM strategy** that prefers the host model, and an **Agent Skill** that is the concrete vehicle for it.
 
@@ -28,17 +28,17 @@ Conclusion: treat sampling as an **optional, best-effort accelerator** (Tier 2),
 
 ## 2. The unifying insight: split *retrieval* from *judgment*
 
-small-memory already separates deterministic machinery from LLM cognition (design §6–§9 vs §10). We exploit that split for host delegation:
+xs-memory already separates deterministic machinery from LLM cognition (design §6–§9 vs §10). We exploit that split for host delegation:
 
 | Work | Needs an LLM? | Who does it |
 |---|---|---|
-| Tokenize, BM25, vector similarity, ANN, graph traversal | **No** | small-memory (server), always |
-| Find near-duplicate candidates (vector clustering) | **No** | small-memory (server) |
-| Surface untagged / unsummarized / unlinked items | **No** | small-memory (server) |
+| Tokenize, BM25, vector similarity, ANN, graph traversal | **No** | xs-memory (server), always |
+| Find near-duplicate candidates (vector clustering) | **No** | xs-memory (server) |
+| Surface untagged / unsummarized / unlinked items | **No** | xs-memory (server) |
 | Decide *which* duplicates to merge; write the merged summary | **Yes** | the driving agent's model (preferred) |
 | Extract entities/relations; assign importance; write tags | **Yes** | the driving agent's model (preferred) |
 
-So in MCP+host mode, **small-memory never calls an LLM for organization.** It emits *work packets* (candidates + context + a task description); the host model performs the judgment using its own LLM, then calls small-memory's fine-grained write tools to persist the result. The host's model is used "as much as possible" by construction.
+So in MCP+host mode, **xs-memory never calls an LLM for organization.** It emits *work packets* (candidates + context + a task description); the host model performs the judgment using its own LLM, then calls xs-memory's fine-grained write tools to persist the result. The host's model is used "as much as possible" by construction.
 
 A configured provider (OpenAI/Claude/Gemini/Ollama, design §11) remains, but only as a **fallback** for headless/CLI/daemon operation where no host model is reachable.
 
@@ -46,13 +46,13 @@ A configured provider (OpenAI/Claude/Gemini/Ollama, design §11) remains, but on
 
 ## 3. Tiered LLM resolution strategy
 
-For any operation that needs judgment, small-memory resolves the executor in this order:
+For any operation that needs judgment, xs-memory resolves the executor in this order:
 
 ```
 Tier 1  HOST-DELEGATED (preferred)
-        small-memory returns a work packet; the host agent's model does the
+        xs-memory returns a work packet; the host agent's model does the
         reasoning and calls back via write tools. Zero extra credentials/cost.
-        Used whenever small-memory is driven by an agent (MCP tools or the Skill).
+        Used whenever xs-memory is driven by an agent (MCP tools or the Skill).
 
 Tier 2  MCP SAMPLING (optional accelerator, off by default)
         Only if the connected client advertises the `sampling` capability at
@@ -61,13 +61,13 @@ Tier 2  MCP SAMPLING (optional accelerator, off by default)
         Deprecating upstream — treat as experimental.
 
 Tier 3  DIRECT PROVIDER (fallback)
-        small-memory's own configured provider (Ollama default for local/private).
+        xs-memory's own configured provider (Ollama default for local/private).
         Used in CLI/daemon/headless mode, or when no host model is available.
 ```
 
 ### 3.1 Capability detection
 
-During the MCP `initialize` handshake, small-memory records the client's declared capabilities and identity (`clientInfo.name`/`version`). From that it computes an **execution mode** per collection:
+During the MCP `initialize` handshake, xs-memory records the client's declared capabilities and identity (`clientInfo.name`/`version`). From that it computes an **execution mode** per collection:
 
 ```go
 type LLMMode int
@@ -130,7 +130,7 @@ This makes `memory_organize` safe to expose everywhere: it degrades to delegatio
 sequenceDiagram
     participant U as Developer
     participant CC as Claude Code (host model)
-    participant SM as small-memory (MCP server)
+    participant SM as xs-memory (MCP server)
     U->>CC: "What did we decide about the cache eviction policy?"
     CC->>SM: memory_recall(collection, query, mode=hybrid)
     SM-->>CC: top-k memories + scores (deterministic)
@@ -142,7 +142,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant CC as Claude Code (host model)
-    participant SM as small-memory (MCP server)
+    participant SM as xs-memory (MCP server)
     CC->>SM: memory_suggest_organization(collection)
     SM-->>CC: work packet {dup_clusters, untagged[], unlinked[], episodic_clusters}
     Note over CC: Host MODEL does the judgment (its own LLM)
@@ -152,13 +152,13 @@ sequenceDiagram
     SM-->>CC: applied (with provenance recorded)
 ```
 
-No second LLM, no extra credentials. small-memory only persisted decisions the host's model made.
+No second LLM, no extra credentials. xs-memory only persisted decisions the host's model made.
 
 ### 5.3 Autonomous (Tier 3, headless daemon)
 
 ```mermaid
 sequenceDiagram
-    participant D as smem daemon (cron)
+    participant D as xsmem daemon (cron)
     participant SM as Organizer
     participant P as Provider (Ollama)
     D->>SM: organize(collection)
@@ -192,32 +192,32 @@ background = ["extract", "dedup", "consolidate"]
 auto_apply_merges = false           # host/operator must confirm soft-destructive merges
 ```
 
-> Privacy note: in HostDelegated mode, memory text is sent to the **host agent's** model (the one the developer already chose). In Provider mode it goes to the configured provider — set `provider = "ollama"` to keep everything local. small-memory never sends data to a model the operator didn't configure.
+> Privacy note: in HostDelegated mode, memory text is sent to the **host agent's** model (the one the developer already chose). In Provider mode it goes to the configured provider — set `provider = "ollama"` to keep everything local. xs-memory never sends data to a model the operator didn't configure.
 
 ---
 
-## 7. The `/small-memory` Agent Skill
+## 7. The `/xs-memory` Agent Skill
 
 ### 7.1 What it is
 
-A Claude Code **Agent Skill** (the open Agent Skills standard) that turns the raw MCP tools into a coherent memory workflow the developer invokes as `/small-memory …` and that Claude can also load automatically when memory is relevant. In Claude Code, a skill is a `SKILL.md` file with instructions that Claude uses when relevant or that you invoke directly with `/skill-name`. The command name comes from the skill's directory name, so `.claude/skills/small-memory/SKILL.md` becomes `/small-memory`.
+A Claude Code **Agent Skill** (the open Agent Skills standard) that turns the raw MCP tools into a coherent memory workflow the developer invokes as `/xs-memory …` and that Claude can also load automatically when memory is relevant. In Claude Code, a skill is a `SKILL.md` file with instructions that Claude uses when relevant or that you invoke directly with `/skill-name`. The command name comes from the skill's directory name, so `.claude/skills/xs-memory/SKILL.md` becomes `/xs-memory`.
 
 The Skill is the **vehicle for Tier-1 host delegation**: its body instructs the host model how to walk a work packet and call back the write tools, so organization happens with the host's LLM.
 
 ### 7.2 Placement & distribution
 
-Skills live at `~/.claude/skills/<name>/` (personal, all projects) or `.claude/skills/<name>/` (project, committed to version control); plugins bundle them under a `skills/` directory. We ship the skill **inside the small-memory plugin** so it travels with the MCP server, and also document manual install.
+Skills live at `~/.claude/skills/<name>/` (personal, all projects) or `.claude/skills/<name>/` (project, committed to version control); plugins bundle them under a `skills/` directory. We ship the skill **inside the xs-memory plugin** so it travels with the MCP server, and also document manual install.
 
 ```
-small-memory-plugin/
+xs-memory-plugin/
 ├── .claude-plugin/plugin.json     # registers the MCP server + skill
 ├── skills/
-│   └── small-memory/
+│   └── xs-memory/
 │       ├── SKILL.md               # entrypoint (below)
 │       ├── REFERENCE.md           # full tool/flag reference (loaded on demand)
 │       └── scripts/
 │           └── recall.sh          # optional CLI shim for non-MCP setups
-└── .mcp.json                      # small-memory MCP server registration
+└── .mcp.json                      # xs-memory MCP server registration
 ```
 
 ### 7.3 Frontmatter design decisions
@@ -227,7 +227,7 @@ Using the documented Claude Code skill frontmatter fields:
 - `description` + `when_to_use`: must contain the words developers actually say ("remember", "recall", "what did we decide", "memory"). Claude uses the description to decide when to load the skill, and the combined description/when_to_use text is capped at 1,536 characters.
 - **Model-invocable = yes** for recall (we *want* Claude to consult memory automatically). So we do **not** set `disable-model-invocation` globally.
 - Destructive ops are **not** triggered by the model: `memory_forget` (hard) and unconfirmed `memory_merge` are routed through explicit user confirmation in the instructions, and the destructive MCP tools are *not* listed in `allowed-tools`. `allowed-tools` pre-approves only the listed tools; everything else still follows your normal permission prompts.
-- `argument-hint` / `arguments`: support subcommands like `/small-memory recall <query>`, `/small-memory organize`, `/small-memory remember <text>`.
+- `argument-hint` / `arguments`: support subcommands like `/xs-memory recall <query>`, `/xs-memory organize`, `/xs-memory remember <text>`.
 - `${CLAUDE_SKILL_DIR}` is used for any bundled script paths so they resolve at personal/project/plugin scope. Claude Code substitutes `${CLAUDE_SKILL_DIR}` with the skill's own directory and `$ARGUMENTS`/`$0`/`$1` with invocation arguments.
 - Keep the body small: an invoked skill's rendered content stays in context for the rest of the session, so every line is a recurring token cost; keep `SKILL.md` well under 500 lines and move detail to supporting files.
 
@@ -235,16 +235,16 @@ Using the documented Claude Code skill frontmatter fields:
 
 ````markdown
 ---
-name: small-memory
+name: xs-memory
 description: >
   Persistent agent memory for this project. Store, recall, and organize notes,
-  decisions, and context across sessions using the small-memory MCP server.
+  decisions, and context across sessions using the xs-memory MCP server.
   Use when the user asks to remember something, asks what was decided or
   discussed earlier, references "my notes"/"our memory"/"last time", or when
   recalling prior context would ground the answer.
 when_to_use: >
   Trigger on: "remember this", "save this to memory", "what did we decide about
-  X", "what do we know about X", "recall …", "/small-memory". Also load
+  X", "what do we know about X", "recall …", "/xs-memory". Also load
   proactively before answering questions that depend on earlier decisions.
 argument-hint: "[recall|remember|organize|forget] <text>"
 arguments: [subcommand, rest]
@@ -253,9 +253,9 @@ allowed-tools: >
   memory_set_tags memory_link memory_suggest_organization memory_stats
 ---
 
-# small-memory
+# xs-memory
 
-Persistent memory for this project, backed by the small-memory MCP server.
+Persistent memory for this project, backed by the xs-memory MCP server.
 Retrieval is deterministic and runs in the server. **You (the host model) do
 all judgment** — summaries, merges, entity/relation extraction — and persist
 results with the write tools. Do not spin up another model.
@@ -297,7 +297,7 @@ If no subcommand is given but the message is a question, prefer **recall** first
 
 ### 7.5 Why this satisfies Feature 1
 
-The Skill never asks small-memory to run an LLM. It tells **the host model** to do extraction/summarization/merge judgment and persist via write tools. That is host-LLM reuse achieved through orchestration rather than sampling — fully supported by Claude Code today, with no extra keys or cost, and it degrades gracefully (recall works even with the organizer idle).
+The Skill never asks xs-memory to run an LLM. It tells **the host model** to do extraction/summarization/merge judgment and persist via write tools. That is host-LLM reuse achieved through orchestration rather than sampling — fully supported by Claude Code today, with no extra keys or cost, and it degrades gracefully (recall works even with the organizer idle).
 
 ---
 
@@ -305,9 +305,9 @@ The Skill never asks small-memory to run an LLM. It tells **the host model** to 
 
 The Agent Skills format is an open standard, but **Codex does not consume `SKILL.md` the same way Claude Code does** today. To deliver the same UX on Codex, ship equivalents that map to Codex's own mechanisms:
 
-- **MCP tools are identical** across hosts — the data/recall/organize tools work in Codex once the small-memory MCP server is registered (Codex historically required `experimental_use_rmcp_client = true` for remote MCP; stdio/local works directly). The host-delegation pattern is host-agnostic.
-- **Custom prompt / instruction file**: provide a `~/.codex/prompts/small-memory.md` (Codex's slash-prompt equivalent) and an `AGENTS.md` snippet that carries the same routing + organization-loop instructions as the SKILL body.
-- **Capability detection** at MCP `initialize` lets small-memory tailor wording (e.g., reference Codex tool names) without code changes.
+- **MCP tools are identical** across hosts — the data/recall/organize tools work in Codex once the xs-memory MCP server is registered (Codex historically required `experimental_use_rmcp_client = true` for remote MCP; stdio/local works directly). The host-delegation pattern is host-agnostic.
+- **Custom prompt / instruction file**: provide a `~/.codex/prompts/xs-memory.md` (Codex's slash-prompt equivalent) and an `AGENTS.md` snippet that carries the same routing + organization-loop instructions as the SKILL body.
+- **Capability detection** at MCP `initialize` lets xs-memory tailor wording (e.g., reference Codex tool names) without code changes.
 
 > Honest scope: maintain one canonical instruction text (the SKILL body) and generate the Codex prompt + AGENTS.md snippet from it, so the two never drift. Treat Claude Code as the reference implementation; Codex as a first-class port.
 
@@ -315,7 +315,7 @@ The Agent Skills format is an open standard, but **Codex does not consume `SKILL
 
 ## 9. Security & privacy considerations
 
-- **Trust boundary**: HostDelegated mode shares memory text only with the model the developer already chose (the host). Provider mode uses the configured provider; recommend Ollama for fully-local. small-memory never contacts an unconfigured endpoint.
+- **Trust boundary**: HostDelegated mode shares memory text only with the model the developer already chose (the host). Provider mode uses the configured provider; recommend Ollama for fully-local. xs-memory never contacts an unconfigured endpoint.
 - **Skill audit**: skills can grant tool access, so ship the skill in a signed/trusted plugin and keep `allowed-tools` minimal (read + non-destructive writes only). Destructive tools require explicit confirmation and are excluded from auto-approval.
 - **Prompt-injection**: stored memories are *data*. The Skill instructs the host model to treat retrieved memory content as reference material, not as instructions. The server marks recalled content as untrusted in tool output where the host supports it.
 - **No silent deletion**: `memory_forget` hard mode and unconfirmed `memory_merge` are never model-triggered (design N7).
@@ -328,7 +328,7 @@ The Agent Skills format is an open standard, but **Codex does not consume `SKILL
 - **Delegation contract**: golden tests asserting `memory_suggest_organization` emits a well-formed work packet and that write-tool callbacks apply with provenance.
 - **No-server-LLM guarantee**: a test asserts that in HostDelegated mode the provider client is **never** called (inject a provider that fails the test if invoked).
 - **Sampling tier**: behind `-tags sampling_experimental`; gated on a fake client that advertises the capability. Excluded from default build (design N1 spirit: optional, isolated).
-- **Skill smoke test**: in a Claude Code session, `/small-memory remember …` then `/small-memory recall …` round-trips; `/small-memory organize` walks a seeded packet and applies merges/links; `/small-memory forget` requires confirmation.
+- **Skill smoke test**: in a Claude Code session, `/xs-memory remember …` then `/xs-memory recall …` round-trips; `/xs-memory organize` walks a seeded packet and applies merges/links; `/xs-memory forget` requires confirmation.
 - **Codex smoke test**: same MCP tools exercised via the Codex prompt equivalent.
 
 **Definition of Done**: recall works with zero LLM; organization works using only the host model in Claude Code (verified: server-side provider never called); destructive ops are confirmation-gated; the same MCP tools function under Codex; sampling remains optional and off by default.
@@ -343,7 +343,7 @@ The Agent Skills format is an open standard, but **Codex does not consume `SKILL
 | H2 | Sampling is Tier-2, optional, capability-gated, off by default, isolated behind a build tag | Avoid depending on a deprecating, unsupported primitive while leaving the door open. |
 | H3 | Server-side provider is fallback only (Tier 3), Ollama default | Headless/CLI still works; local-first privacy. |
 | H4 | Retrieval/similarity is always deterministic & LLM-free | Recall must never depend on any model being available (design N4). |
-| H5 | `/small-memory` skill is model-invocable for recall, confirmation-gated for destructive ops | We want automatic recall; we never want automatic deletion. |
+| H5 | `/xs-memory` skill is model-invocable for recall, confirmation-gated for destructive ops | We want automatic recall; we never want automatic deletion. |
 | H6 | One canonical instruction text; Codex prompt + AGENTS.md generated from it | Prevent drift across hosts. |
 | H7 | `memory_organize` degrades to a work packet instead of failing when no model tier is present | Safe to expose everywhere. |
 

@@ -20,7 +20,7 @@ func (s *Store) Export(w io.Writer) error {
 
 	// Save manifest before export.
 	if err := storage.WriteManifest(s.path, s.manifest); err != nil {
-		return fmt.Errorf("smem: export write manifest: %w", err)
+		return fmt.Errorf("xsmem: export write manifest: %w", err)
 	}
 
 	gw := gzip.NewWriter(w)
@@ -74,12 +74,12 @@ func (s *Store) Export(w io.Writer) error {
 // Import restores a store from a tar.gz archive. See design §6.1.
 func Import(path string, r io.Reader) error {
 	if err := os.MkdirAll(path, 0o755); err != nil {
-		return fmt.Errorf("smem: import mkdir: %w", err)
+		return fmt.Errorf("xsmem: import mkdir: %w", err)
 	}
 
 	gr, err := gzip.NewReader(r)
 	if err != nil {
-		return fmt.Errorf("smem: import gzip: %w", err)
+		return fmt.Errorf("xsmem: import gzip: %w", err)
 	}
 	defer gr.Close()
 
@@ -90,14 +90,14 @@ func Import(path string, r io.Reader) error {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("smem: import tar: %w", err)
+			return fmt.Errorf("xsmem: import tar: %w", err)
 		}
 
 		target := filepath.Join(path, header.Name)
 
 		// Prevent path traversal.
 		if !strings.HasPrefix(target, filepath.Clean(path)+string(os.PathSeparator)) && target != filepath.Clean(path) {
-			return fmt.Errorf("smem: import: invalid path %q", header.Name)
+			return fmt.Errorf("xsmem: import: invalid path %q", header.Name)
 		}
 
 		switch header.Typeflag {

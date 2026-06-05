@@ -12,7 +12,7 @@ import (
 func openTestStore(t *testing.T, opts ...xsmem.Option) *xsmem.Store {
 	t.Helper()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "test.smem")
+	path := filepath.Join(dir, "test.xsmem")
 	s, err := xsmem.Open(path, opts...)
 	if err != nil {
 		t.Fatalf("Open: %v", err)

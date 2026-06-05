@@ -1,4 +1,4 @@
-// Package mcp implements the MCP (Model Context Protocol) server for small-memory.
+// Package mcp implements the MCP (Model Context Protocol) server for xs-memory.
 // Uses stdio transport by default. See design §13.2 and addendum §4.
 package mcp
 
@@ -56,7 +56,7 @@ func NewServer(store *xsmem.Store, opts ...ServerOption) *Server {
 	}
 
 	mcpSrv := server.NewMCPServer(
-		"small-memory",
+		"xs-memory",
 		"0.2.0",
 		server.WithToolCapabilities(true),
 	)

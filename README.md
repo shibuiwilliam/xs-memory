@@ -1,4 +1,4 @@
-# small-memory
+# xs-memory
 
 An embedded memory engine for local AI agents — think **"SQLite for AI Agents"**.
 
@@ -20,7 +20,7 @@ Pure Go, single binary, no external servers. Store memories, search them with fu
 ### Install with `go install`
 
 ```bash
-go install github.com/small-memory/small-memory/cmd/smem@latest
+go install github.com/xs-memory/xs-memory/cmd/xsmem@latest
 ```
 
 Make sure `$(go env GOPATH)/bin` is in your `PATH`:
@@ -32,37 +32,37 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 ### Install from source
 
 ```bash
-git clone https://github.com/small-memory/small-memory.git
-cd small-memory
+git clone https://github.com/xs-memory/xs-memory.git
+cd xs-memory
 make build
 ```
 
-The binary lands in `bin/smem`. To make it globally available:
+The binary lands in `bin/xsmem`. To make it globally available:
 
 ```bash
-sudo cp bin/smem /usr/local/bin/
+sudo cp bin/xsmem /usr/local/bin/
 ```
 
 ### Basic usage
 
 ```bash
 # Create a new memory store
-smem init myproject.smem --collection default --analyzer ja
+xsmem init myproject.xsmem --collection default --analyzer ja
 
 # Add memories
-smem add myproject.smem --collection default notes.md
-echo "Claude Codeはターミナルで動くAIアシスタントです" | smem add myproject.smem --collection default -
+xsmem add myproject.xsmem --collection default notes.md
+echo "Claude Codeはターミナルで動くAIアシスタントです" | xsmem add myproject.xsmem --collection default -
 
 # Search
-smem search myproject.smem "AIアシスタント" --mode hybrid --topk 5
+xsmem search myproject.xsmem "AIアシスタント" --mode hybrid --topk 5
 
 # Inspect
-smem ls myproject.smem --collection default
-smem get myproject.smem <memory-id>
-smem stats myproject.smem
+xsmem ls myproject.xsmem --collection default
+xsmem get myproject.xsmem <memory-id>
+xsmem stats myproject.xsmem
 
 # Delete (soft by default)
-smem rm myproject.smem <memory-id>
+xsmem rm myproject.xsmem <memory-id>
 ```
 
 ### MCP server
@@ -70,7 +70,7 @@ smem rm myproject.smem <memory-id>
 Expose the memory store to AI agents via [Model Context Protocol](https://modelcontextprotocol.io):
 
 ```bash
-smem mcp myproject.smem
+xsmem mcp myproject.xsmem
 ```
 
 This starts an MCP server over stdio, compatible with Claude Code, VS Code, and other MCP clients.
@@ -81,15 +81,15 @@ This starts an MCP server over stdio, compatible with Claude Code, VS Code, and 
 
 | Flag | Short | Default | Description |
 |---|---|---|---|
-| `--store <path>` | | `default.smem` | Path to store directory |
+| `--store <path>` | | `default.xsmem` | Path to store directory |
 | `--collection <name>` | `-c` | `default` | Collection name |
 
-### `smem init`
+### `xsmem init`
 
 Initialize a new store.
 
 ```bash
-smem init [store] [flags]
+xsmem init [store] [flags]
 ```
 
 | Flag | Default | Description |
@@ -98,12 +98,12 @@ smem init [store] [flags]
 | `--embedder <id>` | | Embedder ID (e.g. `ollama:nomic-embed-text`) |
 | `--dim <int>` | `0` | Embedding dimension |
 
-### `smem add`
+### `xsmem add`
 
 Add memories to the store. Reads from files or stdin (`-`).
 
 ```bash
-smem add [store] [file... | -] [flags]
+xsmem add [store] [file... | -] [flags]
 ```
 
 | Flag | Default | Description |
@@ -112,12 +112,12 @@ smem add [store] [file... | -] [flags]
 | `--source <source>` | | Source identifier (auto-detected from filename or `stdin`) |
 | `--importance <float>` | `0.5` | Importance score (`0..1`) |
 
-### `smem search`
+### `xsmem search`
 
 Search memories using full-text, vector, or hybrid mode.
 
 ```bash
-smem search [store] <query> [flags]
+xsmem search [store] <query> [flags]
 ```
 
 | Flag | Default | Description |
@@ -126,24 +126,24 @@ smem search [store] <query> [flags]
 | `--topk <int>` | `10` | Number of results to return |
 | `--json` | `false` | Output as JSON |
 
-### `smem get`
+### `xsmem get`
 
 Retrieve a memory by ID.
 
 ```bash
-smem get <id> [flags]
+xsmem get <id> [flags]
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--json` | `false` | Output as JSON |
 
-### `smem update`
+### `xsmem update`
 
 Update fields of an existing memory. Only explicitly provided flags are applied.
 
 ```bash
-smem update <id> [flags]
+xsmem update <id> [flags]
 ```
 
 | Flag | Default | Description |
@@ -152,81 +152,81 @@ smem update <id> [flags]
 | `--importance <float>` | | New importance score (`0..1`) |
 | `--type <type>` | | New memory type (`episodic`, `semantic`, `procedural`) |
 
-### `smem rm`
+### `xsmem rm`
 
 Remove a memory. Soft delete (tombstone) by default.
 
 ```bash
-smem rm <id> [flags]
+xsmem rm <id> [flags]
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--hard` | `false` | Permanently delete instead of tombstoning |
 
-### `smem ls`
+### `xsmem ls`
 
 List memories in a collection.
 
 ```bash
-smem ls [flags]
+xsmem ls [flags]
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--json` | `false` | Output as JSON |
 
-### `smem link`
+### `xsmem link`
 
 Create a graph edge (triple) between entities.
 
 ```bash
-smem link <subject> <predicate> <object>
+xsmem link <subject> <predicate> <object>
 ```
 
 No additional flags.
 
-### `smem organize`
+### `xsmem organize`
 
 Run LLM organization jobs manually.
 
 ```bash
-smem organize [flags]
+xsmem organize [flags]
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--jobs <list>` | | Comma-separated jobs to run (`extract`, `autotag`, `importance`, `dedup`) |
 
-### `smem stats`
+### `xsmem stats`
 
 Show store statistics (memory count, segments, cache hit rate).
 
 ```bash
-smem stats [flags]
+xsmem stats [flags]
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--json` | `false` | Output as JSON |
 
-### `smem mcp`
+### `xsmem mcp`
 
 Start an MCP (Model Context Protocol) server over stdio.
 
 ```bash
-smem mcp
+xsmem mcp
 ```
 
 No additional flags.
 
-### `smem export` / `smem import`
+### `xsmem export` / `xsmem import`
 
 Export a store to or import from a tar.gz archive.
 
 ```bash
-smem export <archive.tar.gz>
-smem import <archive.tar.gz>
+xsmem export <archive.tar.gz>
+xsmem import <archive.tar.gz>
 ```
 
 No additional flags.
@@ -236,7 +236,7 @@ No additional flags.
 ```
 CLI / MCP / Web UI          ← thin adapters
         │
-    package smem             ← public API (the only stable surface)
+    package xsmem             ← public API (the only stable surface)
         │
     internal/                ← engine internals
     ├── storage/             WAL, segments, block cache (LRU), bbolt
@@ -250,7 +250,7 @@ CLI / MCP / Web UI          ← thin adapters
     └── analyzer/            ja (Kagome), en, bigram
 ```
 
-All interfaces (`CLI`, `MCP`, `Web UI`) talk only to `package smem`. Nothing reaches into `internal/` directly.
+All interfaces (`CLI`, `MCP`, `Web UI`) talk only to `package xsmem`. Nothing reaches into `internal/` directly.
 
 ## Configuration
 
@@ -258,7 +258,7 @@ Settings are loaded with priority: **flags > env vars > config file (TOML) > def
 
 ```toml
 [store]
-path = "~/.smem/default.smem"
+path = "~/.xsmem/default.xsmem"
 
 [memory]
 block_cache_mb = 256
@@ -296,7 +296,7 @@ Always run `make fmt && make lint && make test` before committing.
 
 **v0.1 (MVP)** — in active development. The goal: `init` → `add` (including Japanese text) → `search --mode hybrid` works in a single pure-Go binary within memory budget.
 
-See [PROJECT.md](PROJECT.md) for the full roadmap and non-negotiable design rules, and [docs/small-memory-design.md](docs/small-memory-design.md) for the detailed design document.
+See [PROJECT.md](PROJECT.md) for the full roadmap and non-negotiable design rules, and [docs/xs-memory-design.md](docs/xs-memory-design.md) for the detailed design document.
 
 ## License
 

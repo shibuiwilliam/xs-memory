@@ -1,7 +1,7 @@
-# PROJECT.md — small-memory
+# PROJECT.md — xs-memory
 
 > This file is the project's "constitution," read first by both AI coding agents (Claude Code) and human developers.
-> For detailed design, [`docs/small-memory-design.md`](docs/small-memory-design.md) is the source of truth. If the two conflict, the design document takes precedence — update `PROJECT.md` accordingly.
+> For detailed design, [`docs/xs-memory-design.md`](docs/xs-memory-design.md) is the source of truth. If the two conflict, the design document takes precedence — update `PROJECT.md` accordingly.
 
 ---
 
@@ -17,7 +17,7 @@
 
 ## 1. Project Overview
 
-`small-memory` is an **embedded memory engine** for locally-running AI agents.
+`xs-memory` is an **embedded memory engine** for locally-running AI agents.
 It aims to be "SQLite for AI agents." No external server required. Single binary. Multi-platform.
 
 - Memory **registration, organization, search, update, and deletion (forgetting)**.
@@ -53,26 +53,26 @@ Corresponds to design document Decision Log (D1–D9). **Changes that violate th
 |---|---|---|
 | N1 | **Pure Go by default, runs as a single binary** | CGO dependencies (e.g., tree-sitter) must always be isolated via **build tag** and excluded from the default build. |
 | N2 | **Explicit memory budget control** | Block cache LRU guarantees an upper bound. Never implement "load everything into RAM." mmap is an `--mmap` advanced option. |
-| N3 | **Core is a library (`smem`); UIs are thin adapters** | CLI/MCP/Web only call `smem`. Never touch the engine layer directly. |
+| N3 | **Core is a library (`xsmem`); UIs are thin adapters** | CLI/MCP/Web only call `xsmem`. Never touch the engine layer directly. |
 | N4 | **No LLM on the critical path** | LLM organization is an async job, optional. Search works even when unconfigured (degraded mode). |
 | N5 | **Don't break: WAL + immutable segments + CRC** | Writes are serialized through the WAL. Recovery via replay. |
 | N6 | **Embedding model/dimensions are stamped on the collection and immutable** | Changes only via a rebuild command. |
 | N7 | **Deletion defaults to soft (tombstone/archive)** | Physical deletion only with an explicit flag. Prevents destruction by LLM auto-organization. |
 | N8 | **Don't retrofit CJK** | Analyzer is fixed per collection. Japanese (Kagome) is one of the defaults. |
-| N9 | **No `internal/` boundary crossing** | Public API is `smem` only. Protects stability. |
+| N9 | **No `internal/` boundary crossing** | Public API is `xsmem` only. Protects stability. |
 
 ---
 
 ## 4. Repository Layout
 
 ```
-small-memory/
+xs-memory/
 ├── PROJECT.md                # this file
 ├── README.md                 # user-facing
 ├── Makefile                  # development tasks (§5)
 ├── go.mod
-├── cmd/smem/                 # CLI entry point
-├── smem/                     # Public Core API (Open/Store/Search...) ← only public package
+├── cmd/xsmem/                # CLI entry point
+├── xsmem/                    # Public Core API (Open/Store/Search...) ← only public package
 ├── internal/
 │   ├── storage/              # WAL, segment, blockcache (LRU), bbolt wrapper
 │   ├── index/
@@ -88,7 +88,7 @@ small-memory/
 │   ├── mcp/                  # MCP server (stdio)
 │   └── web/                  # Web UI (build tag: webui)
 └── docs/
-    └── small-memory-design.md
+    └── xs-memory-design.md
 ```
 
 **Placement rules**: New concerns go under the appropriate `internal/<domain>`. `storage.Engine` / `provider.Embedder` / `provider.LLM` / `analyzer.Analyzer` are interface-abstracted, keeping implementations swappable.
@@ -100,7 +100,7 @@ small-memory/
 The agent should use these by default. Add new targets to the Makefile if needed.
 
 ```bash
-make build         # go build -o bin/smem ./cmd/smem  (default: pure Go, CGO_ENABLED=0)
+make build         # go build -o bin/xsmem ./cmd/xsmem  (default: pure Go, CGO_ENABLED=0)
 make build-all     # cross-compile for all OS/Arch
 make run -- <args> # local execution
 make test          # go test ./... -race
@@ -141,7 +141,7 @@ Minimum before PR/commit: `make fmt && make lint && make test`.
 ### MVP (v0.1) — "Can Remember"
 Recommended implementation order:
 
-1. `smem.Open/Close` with store directory scaffolding and `manifest.json`.
+1. `xsmem.Open/Close` with store directory scaffolding and `manifest.json`.
 2. `internal/storage`: WAL → memtable → immutable segments → bbolt metadata. Minimum to write and read.
 3. Block cache (LRU) and memory budget (**enforce N2 from the start**).
 4. `internal/analyzer`: en / bigram → kagome (ja).
@@ -149,7 +149,7 @@ Recommended implementation order:
 6. `index/vector`: flat + int8 quantization, cosine/dot.
 7. `search`: FTS / Vector / Hybrid (RRF).
 8. `provider`: `ollama`, `openai`, `mock` (embedding only is sufficient).
-9. `cmd/smem`: `init / add / search / get / rm / ls / stats`.
+9. `cmd/xsmem`: `init / add / search / get / rm / ls / stats`.
 
 **MVP Definition of Done**: `init → add (including Japanese content) → search --mode hybrid` works as a single binary (CGO_ENABLED=0), builds for all OSes, and does not exceed the memory budget.
 
@@ -160,7 +160,7 @@ Recommended implementation order:
 - **Errors**: Wrap with `fmt.Errorf("...: %w", err)`. Sentinel errors use `errors.Is/As`. Libraries never panic (except for unrecoverable initialization).
 - **context**: External I/O, LLM, and search take `context.Context` as the first argument. Respect cancellation/timeouts.
 - **Logging**: `log/slog`. **Never log API keys, full content bodies, or PII.**
-- **Minimal public API**: When in doubt, put it in `internal/`. Prioritize backward compatibility of the `smem` package.
+- **Minimal public API**: When in doubt, put it in `internal/`. Prioritize backward compatibility of the `xsmem` package.
 - **Interfaces are defined by the consumer**; implementations return concrete types ("accept interfaces, return structs").
 - **Concurrency**: Shared state is explicitly protected. Must pass `-race`.
 - **Naming/formatting**: gofumpt + goimports. Abbreviations follow conventions (ID, URL, FTS, LRU).

@@ -7,7 +7,7 @@ package mcputil
 type LLMMode int
 
 const (
-	// ModeHostDelegated — Tier 1: agent-driven. small-memory returns work packets;
+	// ModeHostDelegated — Tier 1: agent-driven. xs-memory returns work packets;
 	// the host agent's model does reasoning and calls back via write tools.
 	// Zero extra credentials/cost. See addendum §3.
 	ModeHostDelegated LLMMode = iota
