@@ -23,6 +23,7 @@ import (
 	"github.com/xs-memory/xs-memory/internal/index/grep"
 	"github.com/xs-memory/xs-memory/internal/index/vector"
 	"github.com/xs-memory/xs-memory/internal/ingest"
+	imetrics "github.com/xs-memory/xs-memory/internal/metrics"
 	"github.com/xs-memory/xs-memory/internal/organizer"
 	"github.com/xs-memory/xs-memory/internal/provider"
 	"github.com/xs-memory/xs-memory/internal/search"
@@ -110,6 +111,13 @@ type Store struct {
 
 	// Tuning store. See addendum2 §1.
 	tuningStore *tuning.Store
+
+	// Metrics recorder. See addendum3 §1, M1.
+	metrics imetrics.Recorder
+
+	// Cached structural stats. See addendum3 §1.6, M5.
+	structuralCache *imetrics.StructuralStats
+	structuralGen   uint64 // generation when cache was computed
 }
 
 // Open opens or creates an xs-memory store at the given path.
@@ -205,6 +213,9 @@ func Open(path string, opts ...Option) (*Store, error) {
 
 	// Initialize tuning store. See addendum2 §1.
 	s.tuningStore = tuning.NewStore(tuning.DefaultConfig())
+
+	// Initialize metrics recorder. See addendum3 §1, M1.
+	s.metrics = imetrics.NewRecorder(cfg.MetricsCfg)
 
 	// Replay WAL for crash recovery. See design §6.5.
 	if err := s.replayWAL(); err != nil {
@@ -393,6 +404,17 @@ func (s *Store) Search(ctx context.Context, opts SearchOpts) ([]Result, error) {
 		col = "default"
 	}
 
+	topK := opts.TopK
+	if topK <= 0 {
+		topK = 10
+	}
+
+	// Capture start time for optional latency histogram. See addendum3 §1.4.
+	var start time.Time
+	if s.metrics.IsEnabled() {
+		start = time.Now()
+	}
+
 	ftsIdx := s.ftsIndexes[col]
 	vecIdx := s.vecIndexes[col]
 
@@ -403,7 +425,7 @@ func (s *Store) Search(ctx context.Context, opts SearchOpts) ([]Result, error) {
 		Text:       opts.Text,
 		Vector:     opts.Vector,
 		Mode:       opts.Mode,
-		TopK:       opts.TopK,
+		TopK:       topK,
 		RRFk:       60,
 	})
 	if err != nil {
@@ -427,7 +449,28 @@ func (s *Store) Search(ctx context.Context, opts SearchOpts) ([]Result, error) {
 		})
 	}
 
+	// Record metrics after search completes. See addendum3 §1.1, §1.3, §1.4.
+	if s.metrics.IsEnabled() {
+		latency := time.Since(start)
+		mode := searchModeToMetrics(opts.Mode)
+		s.metrics.RecordSearch(col, mode, len(out), topK, latency)
+	}
+
 	return out, nil
+}
+
+// searchModeToMetrics maps search.Mode to metrics.Mode. See addendum3 §1.5.
+func searchModeToMetrics(m SearchMode) imetrics.Mode {
+	switch m {
+	case FTS:
+		return imetrics.ModeFTS
+	case Vector:
+		return imetrics.ModeVector
+	case Hybrid:
+		return imetrics.ModeHybrid
+	default:
+		return imetrics.ModeHybrid
+	}
 }
 
 // SearchOpts are the options for Search.
@@ -592,12 +635,14 @@ func (s *Store) List(ctx context.Context, collection string) ([]Memory, error) {
 
 // Stats returns store statistics.
 type Stats struct {
-	Path            string             `json:"path"`
-	Collections     int                `json:"collections"`
-	Memories        int                `json:"memories"`
-	BlockCacheStats CacheStatsInfo     `json:"block_cache"`
-	ResultCache     icache.Stats       `json:"result_cache"`
-	Tuning          tuning.TuningStats `json:"tuning"`
+	Path            string                   `json:"path"`
+	Collections     int                      `json:"collections"`
+	Memories        int                      `json:"memories"`
+	BlockCacheStats CacheStatsInfo           `json:"block_cache"`
+	ResultCache     icache.Stats             `json:"result_cache"`
+	Tuning          tuning.TuningStats       `json:"tuning"`
+	Structural      imetrics.StructuralStats `json:"structural"`      // see addendum3 §1.6
+	MetricsEnabled  bool                     `json:"metrics_enabled"` // see addendum3 M1
 }
 
 type CacheStatsInfo struct {
@@ -607,11 +652,13 @@ type CacheStatsInfo struct {
 }
 
 func (s *Store) Stats() Stats {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	cs := s.cache.Stats()
+
+	structural := s.StructuralStats()
+
+	s.mu.RLock()
 	mems, _ := s.meta.ListMemories("")
+	s.mu.RUnlock()
 
 	return Stats{
 		Path:        s.path,
@@ -622,8 +669,10 @@ func (s *Store) Stats() Stats {
 			UsedMB:     float64(cs.Used) / (1024 * 1024),
 			Count:      cs.Count,
 		},
-		ResultCache: s.resultCache.Stats(),
-		Tuning:      s.tuningStore.Stats(),
+		ResultCache:    s.resultCache.Stats(),
+		Tuning:         s.tuningStore.Stats(),
+		Structural:     structural,
+		MetricsEnabled: s.metrics.IsEnabled(),
 	}
 }
 
@@ -640,6 +689,84 @@ func (s *Store) TuningReset(collection string) {
 // TuningEpoch returns the current tuning epoch.
 func (s *Store) TuningEpoch() uint64 {
 	return s.tuningStore.Epoch()
+}
+
+// MetricsSnapshot returns a point-in-time snapshot of all metrics.
+// Returns an empty snapshot when metrics are disabled. See addendum3 §3.
+func (s *Store) MetricsSnapshot(collection string) *MetricsSnapshot {
+	snap := s.metrics.Snapshot(collection)
+	snap.ComputeModeDistribution()
+	return snap
+}
+
+// MetricsReset clears all metrics aggregates. See addendum3 §2.
+func (s *Store) MetricsReset(collection string) {
+	s.metrics.Reset(collection)
+}
+
+// MetricsEnabled returns true if the metrics subsystem is active. See addendum3 M1.
+func (s *Store) MetricsEnabled() bool {
+	return s.metrics.IsEnabled()
+}
+
+// StructuralStats returns index-level structural statistics, cached by
+// the generation counter so repeated calls are O(1) between writes.
+// See addendum3 §1.6, M5.
+func (s *Store) StructuralStats() imetrics.StructuralStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Check if cached value is still fresh (same generation). See addendum3 M5.
+	currentGen := s.resultCache.GetGeneration("default")
+	for col := range s.manifest.Collections {
+		g := s.resultCache.GetGeneration(col)
+		if g > currentGen {
+			currentGen = g
+		}
+	}
+
+	if s.structuralCache != nil && s.structuralGen == currentGen {
+		return *s.structuralCache
+	}
+
+	// Recompute.
+	stats := imetrics.StructuralStats{
+		Collections: len(s.manifest.Collections),
+	}
+
+	mems, _ := s.meta.ListMemories("")
+	stats.Memories = len(mems)
+
+	// Count tombstones.
+	for _, m := range mems {
+		if m.Deleted {
+			stats.Tombstones++
+		}
+	}
+	// ListMemories returns non-deleted; count all including deleted.
+	stats.Memories = len(mems)
+
+	// FTS stats.
+	for _, idx := range s.ftsIndexes {
+		stats.FTSTermCount += idx.TermCount()
+		stats.FTSDocCount += idx.DocCount()
+	}
+
+	// Vector stats.
+	for _, idx := range s.vecIndexes {
+		stats.VectorCount += idx.DocCount()
+		stats.VectorDim = idx.Dim()
+		stats.VectorQuantize = idx.Quantized()
+	}
+
+	// Graph stats.
+	if s.graph != nil {
+		stats.GraphEdgeCount = s.graph.Count()
+	}
+
+	s.structuralCache = &stats
+	s.structuralGen = currentGen
+	return stats
 }
 
 // --- internal helpers ---

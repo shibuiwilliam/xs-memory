@@ -193,3 +193,10 @@ func (idx *Index) DocCount() int {
 	defer idx.mu.RUnlock()
 	return idx.totalDocs
 }
+
+// TermCount returns the number of unique terms in the index. See addendum3 §1.6.
+func (idx *Index) TermCount() int {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	return len(idx.postings)
+}

@@ -26,6 +26,7 @@ make lint          # golangci-lint
 make fmt           # gofumpt + goimports
 make bench         # Search latency / cache hit rate
 make run -- <args> # Local execution
+make mcp-init      # Build binary + initialize .xsmem/dev.xsmem store
 ```
 
 - **Before every commit/PR**: Make `make fmt && make lint && make test` green.
@@ -79,6 +80,18 @@ For destructive or wide-ranging operations (bulk file changes, deletions, `go mo
 - **LRU eviction and semantic forgetting (Organizer) are different things.** Conflating them leads to data-loss bugs.
 - **Measure before optimizing vector strategy.** MVP uses flat + int8 quantization. Do not add HNSW on your own (design doc D4).
 - When touching WAL / segments / compaction, always update crash recovery and LRU tests.
+
+---
+
+## Local xs-memory MCP
+
+This project uses its own `xsmem` binary as an MCP server for persistent agent memory.
+Config is in `.mcp.json`; the store lives at `.xsmem/dev.xsmem`.
+
+- **First-time setup**: `make mcp-init` (builds binary + creates store if missing).
+- **After code changes to xsmem**: `make build` to update `bin/xsmem` so the MCP server picks up the latest.
+- **Skill**: `/xs-memory` — recall, remember, organize, forget. See `skills/xs-memory/SKILL.md`.
+- **Cleanup**: `xsmem clean --store .xsmem/dev.xsmem` to wipe the store.
 
 ---
 

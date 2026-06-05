@@ -1,6 +1,9 @@
 package xsmem
 
-import "github.com/xs-memory/xs-memory/internal/provider"
+import (
+	"github.com/xs-memory/xs-memory/internal/metrics"
+	"github.com/xs-memory/xs-memory/internal/provider"
+)
 
 // config holds store configuration. See design §14.
 type config struct {
@@ -10,6 +13,7 @@ type config struct {
 	ChunkTokens     int
 	ChunkOverlap    int
 	DefaultAnalyzer string
+	MetricsCfg      metrics.Config // see addendum3 §4
 }
 
 func defaultConfig() config {
@@ -59,3 +63,19 @@ func WithLLM(llm provider.LLM) Option {
 		c.LLM = llm
 	}
 }
+
+// WithMetrics sets the metrics configuration. See addendum3 §4, M1.
+func WithMetrics(cfg metrics.Config) Option {
+	return func(c *config) {
+		c.MetricsCfg = cfg
+	}
+}
+
+// MetricsConfig re-exports for public API access. See addendum3 §4.
+type MetricsConfig = metrics.Config
+
+// MetricsSnapshot re-exports for public API access. See addendum3 §3.
+type MetricsSnapshot = metrics.Snapshot
+
+// StructuralStats re-exports for public API access. See addendum3 §1.6.
+type StructuralStatsInfo = metrics.StructuralStats

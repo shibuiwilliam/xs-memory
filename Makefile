@@ -8,7 +8,7 @@ GOTEST   := CGO_ENABLED=0 go test
 GOFLAGS  := -trimpath
 LDFLAGS  := -s -w
 
-.PHONY: build build-all run test test-short bench lint fmt tidy webui clean install-hooks
+.PHONY: build build-all run test test-short bench lint fmt tidy webui mcp-init clean install-hooks
 
 ## build: compile for the current platform (pure Go, no CGO)
 build:
@@ -62,6 +62,15 @@ install-hooks:
 	cp scripts/pre-commit .git/hooks/pre-commit
 	chmod +x .git/hooks/pre-commit
 	@echo "Pre-commit hook installed."
+
+## mcp-init: build binary and initialize the local MCP store
+mcp-init: build
+	@mkdir -p .xsmem
+	@if [ ! -f .xsmem/dev.xsmem/manifest.json ]; then \
+		./$(BINDIR)/$(BINARY) init .xsmem/dev.xsmem; \
+	else \
+		echo "Store .xsmem/dev.xsmem already exists, skipping init."; \
+	fi
 
 ## clean: remove build artifacts
 clean:

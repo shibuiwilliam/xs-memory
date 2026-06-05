@@ -39,6 +39,12 @@ var statsCmd = &cobra.Command{
 		fmt.Printf("Tuning:       epoch=%d, events=%d, priors=%d, affinities=%d\n",
 			stats.Tuning.Epoch, stats.Tuning.EventCount,
 			stats.Tuning.PriorCount, stats.Tuning.AffinityCount)
+		fmt.Printf("FTS Index:    %d terms, %d docs\n",
+			stats.Structural.FTSTermCount, stats.Structural.FTSDocCount)
+		fmt.Printf("Vector Index: %d vectors (dim=%d, quantize=%v)\n",
+			stats.Structural.VectorCount, stats.Structural.VectorDim, stats.Structural.VectorQuantize)
+		fmt.Printf("Graph:        %d edges\n", stats.Structural.GraphEdgeCount)
+		fmt.Printf("Metrics:      enabled=%v\n", stats.MetricsEnabled)
 		return nil
 	},
 }

@@ -193,6 +193,15 @@ func NewServer(store *xsmem.Store, opts ...ServerOption) *Server {
 		mcp.WithString("collection", mcp.Description("Collection name")),
 	), s.handleOrganize)
 
+	// --- Metrics tool (addendum3 §3) ---
+
+	mcpSrv.AddTool(mcp.NewTool(
+		"memory_metrics",
+		mcp.WithDescription("Search metrics: counts, hit rate, mode distribution, latency. See addendum3 §3."),
+		mcp.WithString("collection", mcp.Description("Collection name (empty = all)")),
+		mcp.WithBoolean("reset", mcp.Description("Reset metrics after reading")),
+	), s.handleMetrics)
+
 	s.mcpServer = mcpSrv
 	return s
 }
@@ -554,6 +563,23 @@ func (s *Server) handleFeedback(_ context.Context, req mcp.CallToolRequest) (*mc
 	})
 
 	return mcp.NewToolResultText(`{"status":"feedback_recorded"}`), nil
+}
+
+// --- Metrics handler (addendum3 §3) ---
+
+func (s *Server) handleMetrics(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	collection, _ := req.GetArguments()["collection"].(string)
+	reset, _ := req.GetArguments()["reset"].(bool)
+
+	snap := s.store.MetricsSnapshot(collection)
+	snap.ComputeModeDistribution()
+
+	if reset {
+		s.store.MetricsReset(collection)
+	}
+
+	data, _ := json.Marshal(snap)
+	return mcp.NewToolResultText(string(data)), nil
 }
 
 // --- helpers ---

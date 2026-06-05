@@ -146,6 +146,11 @@ func (idx *Index) Dim() int {
 	return idx.dim
 }
 
+// Quantized returns whether int8 quantization is active.
+func (idx *Index) Quantized() bool {
+	return idx.quantize
+}
+
 // --- Quantization (int8 scalar quantization) ---
 // See design §7.2: scalar quantization to int8.
 
