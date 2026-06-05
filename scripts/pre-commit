@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Pre-commit hook: format check, vet, and test.
+# Install: make install-hooks
+set -euo pipefail
+
+echo "pre-commit: checking format..."
+UNFORMATTED=$(gofumpt -l . 2>/dev/null || true)
+if [ -n "$UNFORMATTED" ]; then
+    echo "ERROR: unformatted files (run 'make fmt'):"
+    echo "$UNFORMATTED"
+    exit 1
+fi
+
+echo "pre-commit: go vet..."
+CGO_ENABLED=0 go vet ./...
+
+echo "pre-commit: running tests..."
+CGO_ENABLED=0 go test ./... -count=1 -timeout 3m
+
+echo "pre-commit: all checks passed."

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "xs-memory": {
+      "command": "./bin/xsmem",
+      "args": ["mcp", "--store", ".xsmem/dev.xsmem"],
+      "env": {}
+    }
+  }
+}

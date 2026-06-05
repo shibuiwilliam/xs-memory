@@ -28,5 +28,18 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+
+bin/
+
+# Local memory stores
+.smem/
+.xsmem/
+default.smem/
+default.xsmem/
+*.smem/
+*.xsmem/
+
+# Claude Code local config
+.claude/

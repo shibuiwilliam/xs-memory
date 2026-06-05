@@ -1,0 +1,12 @@
+{
+  "name": "xs-memory",
+  "version": "0.2.0",
+  "description": "Persistent agent memory engine — store, recall, and organize notes across sessions",
+  "mcp_servers": {
+    "xs-memory": {
+      "command": "xsmem",
+      "args": ["mcp", "--store", "~/.xsmem/default.xsmem"]
+    }
+  },
+  "skills": ["skills/xs-memory"]
+}
